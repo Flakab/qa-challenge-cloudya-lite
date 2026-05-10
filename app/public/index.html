@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cloudya Lite</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f2f5; }
+    .login-page, .app-page { min-height: 100vh; display: flex; justify-content: center; align-items: center; }
+    .app-page { align-items: flex-start; padding: 30px; }
+    .login-box { background: white; padding: 40px; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.1); width: 380px; min-width: 380px; }
+    .login-box h1 { font-size: 24px; margin-bottom: 8px; color: #1a1a1a; }
+    .login-box p { color: #666; margin-bottom: 24px; font-size: 14px; }
+    .form-group { margin-bottom: 16px; }
+    .form-group label { display: block; margin-bottom: 6px; font-weight: 600; font-size: 14px; color: #333; }
+    .form-group input { width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; }
+    .form-group input:focus { outline: none; border-color: #0066cc; }
+    .error-msg { color: #dc3545; font-size: 13px; margin-bottom: 12px; display: none; }
+    .btn-login { width: 100%; padding: 12px; background: #0066cc; color: white; border: none; border-radius: 6px; font-size: 15px; cursor: pointer; font-weight: 600; }
+    .btn-login:hover { background: #0052a3; }
+    .app-container { max-width: 900px; margin: 0 auto; width: 100%; }
+    .app-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+    .app-header h1 { font-size: 22px; }
+    .btn-logout { padding: 8px 16px; background: #6c757d; color: white; border: none; border-radius: 6px; cursor: pointer; }
+    .search-section { display: flex; gap: 10px; margin-bottom: 24px; flex-wrap: nowrap; }
+    .search-section input { flex: 1; padding: 10px 14px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; min-width: 300px; }
+    .search-section button { padding: 10px 20px; background: #0066cc; color: white; border: none; border-radius: 6px; cursor: pointer; white-space: nowrap; }
+    .contact-card { background: white; padding: 16px; margin-bottom: 10px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+    .contact-card h3 { font-size: 16px; margin-bottom: 2px; }
+    .contact-card .details { color: #666; font-size: 13px; }
+    .contact-card .dept { background: #e8f0fe; color: #0066cc; padding: 4px 10px; border-radius: 12px; font-size: 12px; }
+    .no-results { text-align: center; padding: 40px; color: #999; }
+    .user-info { color: #666; font-size: 13px; margin-bottom: 4px; }
+  </style>
+</head>
+<body>
+
+  <!-- LOGIN PAGE -->
+  <div class="login-page" id="loginPage">
+    <div class="login-box">
+      <h1>☁️ Cloudya Lite</h1>
+      <p>Sign in to your account</p>
+      <div class="error-msg" id="loginError"></div>
+      <div class="form-group">
+        <label for="email">Email</label>
+        <input type="email" id="email" placeholder="your@email.com">
+      </div>
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input type="text" id="password" placeholder="Password">
+      </div>
+      <button class="btn-login" id="loginBtn" onclick="login()">Sign In</button>
+    </div>
+  </div>
+
+  <!-- APP PAGE -->
+  <div class="app-page" id="appPage" style="display:none;">
+    <div class="app-container">
+      <div class="app-header">
+        <div>
+          <div class="user-info" id="userInfo"></div>
+          <h1>Contacts</h1>
+        </div>
+        <button class="btn-logout" onclick="logout()">Logout</button>
+      </div>
+
+      <div class="search-section">
+        <input type="text" id="searchInput" placeholder="Search by name, email, or department...">
+        <button id="searchBtn" onclick="searchContacts()">Search</button>
+      </div>
+
+      <div id="contactList"></div>
+      <div class="no-results" id="noResults" style="display:none;">No contacts found.</div>
+    </div>
+  </div>
+
+  <script>
+    let authToken = null;
+
+    async function login() {
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      const errorEl = document.getElementById('loginError');
+
+      if (!email || !password) {
+        errorEl.textContent = 'Please enter email and password';
+        errorEl.style.display = 'block';
+        return;
+      }
+
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        authToken = data.token;
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('user', JSON.stringify(data.user));
+        showApp(data.user.email);
+      } else {
+        errorEl.textContent = data.message;
+        errorEl.style.display = 'block';
+      }
+    }
+
+    function showApp(email) {
+      document.getElementById('loginPage').style.display = 'none';
+      document.getElementById('appPage').style.display = 'flex';
+      document.getElementById('userInfo').textContent = `Logged in as ${email}`;
+      loadContacts();
+    }
+
+    async function loadContacts(query = '') {
+      const url = query ? `/api/contacts?q=${query}` : '/api/contacts';
+      const res = await fetch(url, {
+        headers: { 'Authorization': `Bearer ${authToken}` }
+      });
+      const contacts = await res.json();
+      renderContacts(contacts);
+    }
+
+    function renderContacts(contacts) {
+      const list = document.getElementById('contactList');
+      const noResults = document.getElementById('noResults');
+
+      if (!contacts || contacts.length === 0) {
+        list.innerHTML = '';
+        noResults.style.display = 'block';
+        return;
+      }
+      noResults.style.display = 'none';
+
+      list.innerHTML = contacts.map(c => `
+        <div class="contact-card">
+          <div>
+            <h3>${c.name}</h3>
+            <div class="details">${c.email} · ${c.phone}</div>
+          </div>
+          <span class="dept">${c.department}</span>
+        </div>
+      `).join('');
+    }
+
+    function searchContacts() {
+      const query = document.getElementById('searchInput').value;
+      loadContacts(query);
+    }
+
+    document.getElementById('searchInput').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') searchContacts();
+    });
+
+    async function logout() {
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${authToken}` }
+      });
+      authToken = null;
+      document.getElementById('appPage').style.display = 'none';
+      document.getElementById('loginPage').style.display = 'flex';
+      document.getElementById('email').value = '';
+      document.getElementById('password').value = '';
+    }
+
+    // Check for existing session on load
+    const savedToken = localStorage.getItem('token');
+    if (savedToken) {
+      authToken = savedToken;
+      const user = JSON.parse(localStorage.getItem('user'));
+      if (user) showApp(user.email);
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+{
+  "name": "qa-challenge-cloudya-lite",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "node server.cjs",
+    "test": "npx playwright test"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.40.0"
+  }
+}

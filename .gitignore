@@ -1,0 +1,10 @@
+# Personal reference files — not for submission
+_personal/
+app/tests/known-bugs.spec.js
+
+# Node
+node_modules/
+
+# Playwright
+app/test-results/
+app/playwright-report/
